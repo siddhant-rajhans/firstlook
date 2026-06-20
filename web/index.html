@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>firstlook — drop a CSV</title>
+<style>
+ :root{--bg:#080814;--panel:#0c0c1f;--ink:#e9e9f4;--muted:#8a8aa0;--cyan:#00E5FF;--line:rgba(255,255,255,.1)}
+ *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);
+   font-family:Inter,system-ui,-apple-system,sans-serif}
+ #wrap{max-width:1080px;margin:0 auto;padding:30px 24px}
+ h1{font-size:28px;font-weight:800;margin:0 0 4px;letter-spacing:-.02em}
+ .sub{color:var(--muted);margin:0 0 20px;font-size:15px;line-height:1.5}
+ #drop{border:1.5px dashed var(--line);border-radius:14px;padding:34px;text-align:center;
+   color:var(--muted);cursor:pointer;transition:border-color .2s,background .2s}
+ #drop.over{border-color:var(--cyan);background:rgba(0,229,255,.06)}
+ .controls{display:flex;gap:12px;align-items:center;margin:16px 0;flex-wrap:wrap}
+ select,button{background:var(--panel);color:var(--ink);border:1px solid var(--line);
+   border-radius:8px;padding:9px 14px;font:inherit}
+ button{cursor:pointer} button.primary{background:var(--cyan);color:#06121a;border-color:var(--cyan);font-weight:700}
+ button:disabled{opacity:.5;cursor:default}
+ label.chk{color:var(--muted);font-size:14px;display:flex;align-items:center;gap:6px}
+ #status{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--muted);min-height:20px;margin:10px 0}
+ #card{margin:18px 0} #plot{width:100%;min-height:200px}
+ a{color:var(--cyan)}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>firstlook</h1>
+  <p class="sub">Drop a CSV and get models worth trying, the right charts, and a data-quality
+    check — running entirely in your browser via Pyodide. Nothing is uploaded anywhere.</p>
+
+  <div id="drop">Drop a CSV here, or click to choose &nbsp;·&nbsp;
+    <a href="#" id="sample">try the sample</a>
+    <input id="file" type="file" accept=".csv" hidden></div>
+
+  <div class="controls" id="ctrls" style="display:none">
+    <label class="chk" for="target">target</label>
+    <select id="target"></select>
+    <label class="chk"><input type="checkbox" id="fit"> fit a leaderboard
+      <span style="color:#6a6a86">(slower — loads scikit-learn)</span></label>
+    <button class="primary" id="go">Analyze</button>
+  </div>
+
+  <div id="status">booting Python in your browser…</div>
+  <div id="card"></div>
+  <div id="plot"></div>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.2/full/pyodide.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -10,4 +10,6 @@ dist/
 venv/
 *.html
 !examples/*.html
+!web/*.html
+web/*.whl
 .DS_Store
