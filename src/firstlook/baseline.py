@@ -1,9 +1,9 @@
 """Train the recommended baseline model and report an honest score.
 
-Needs scikit-learn (the ``fit`` / ``dev`` extra). Preprocessing is built in —
-median-impute + scale numerics, most-frequent-impute + one-hot categoricals —
-so it fits straight on the messy data the recommender only *warns* about.
-Scoring is cross-validated, so a tiny test split can't flatter or wreck it.
+Needs scikit-learn (the ``fit`` / ``dev`` extra). Preprocessing is built into
+the pipeline (median-impute + scale numerics, most-frequent-impute + one-hot
+categoricals), so it fits straight on the messy data the recommender only warns
+about. Scoring is cross-validated, so a tiny test split can't flatter or wreck it.
 """
 from dataclasses import dataclass
 from typing import Optional
@@ -28,7 +28,7 @@ class Baseline:
 def fit_baseline(df, target, task):
     """Cross-validate the recommended start model; return a :class:`Baseline`."""
     if task == "clustering" or target is None:
-        return Baseline(None, None, None, note="no target — nothing to fit")
+        return Baseline(None, None, None, note="no target, nothing to fit")
     try:
         from sklearn.linear_model import LinearRegression, LogisticRegression
         from sklearn.model_selection import cross_val_score
@@ -38,7 +38,7 @@ def fit_baseline(df, target, task):
         from sklearn.impute import SimpleImputer
     except ImportError as e:
         raise ImportError(
-            "baseline fitting needs scikit-learn — install it with "
+            "baseline fitting needs scikit-learn; install it with "
             "`pip install 'firstlook[fit]'`"
         ) from e
 
@@ -65,13 +65,20 @@ def fit_baseline(df, target, task):
         model, name, metric, scoring = LinearRegression(), "LinearRegression", "R2", "r2"
         cv = min(5, max(2, n // 4))
     else:
-        per_class = int(y.value_counts().min())
+        vc = y.value_counts()
+        per_class = int(vc.min())
         if per_class < 2:
             return Baseline("LogisticRegression", "accuracy", None,
                             note="a class has <2 samples; can't cross-validate")
         model = LogisticRegression(max_iter=1000)
-        name, metric, scoring = "LogisticRegression", "accuracy", "accuracy"
+        name = "LogisticRegression"
         cv = min(5, max(2, per_class))
+        # plain accuracy flatters imbalanced data (a majority-only guesser scores
+        # high), so switch to balanced accuracy exactly when imbalance is flagged.
+        if (vc.max() / len(y)) > 0.7:
+            metric, scoring = "balanced accuracy", "balanced_accuracy"
+        else:
+            metric, scoring = "accuracy", "accuracy"
 
     pipe = Pipeline([("pre", pre), ("model", model)])
     scores = cross_val_score(pipe, X, y, cv=cv, scoring=scoring)

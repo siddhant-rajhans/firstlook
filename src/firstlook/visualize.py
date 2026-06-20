@@ -15,25 +15,48 @@ def _numeric_feats(df, target):
     return [c for c in df.columns if c != target and pd.api.types.is_numeric_dtype(df[c])]
 
 
-def _rank_by_target_corr(df, target, num):
-    """Order numeric features by |correlation| with the target (encoded if needed)."""
+def _corr_ratio(cats, values):
+    """Correlation ratio (eta-squared): association between a categorical
+    target and a numeric feature — between-group variance over total variance."""
+    d = pd.DataFrame({"c": cats.values, "v": pd.to_numeric(values, errors="coerce").values}).dropna()
+    if d.empty:
+        return 0.0
+    grand = d["v"].mean()
+    ss_total = ((d["v"] - grand) ** 2).sum()
+    if ss_total == 0:
+        return 0.0
+    ss_between = sum(len(g) * (g["v"].mean() - grand) ** 2 for _, g in d.groupby("c"))
+    return ss_between / ss_total
+
+
+def _rank_features(df, target, num, task):
+    """Order numeric features by association with the target.
+
+    Classification uses the correlation ratio (eta-squared) — the right measure
+    for a categorical target. Regression uses |Pearson r|. Ranking features by
+    correlation with integer-encoded class labels would impose a fake ordering
+    on the classes, so we don't.
+    """
     if target is None or not num:
         return num
     y = df[target]
-    yc = y if pd.api.types.is_numeric_dtype(y) else y.astype("category").cat.codes
-    def corr(c):
-        try:
-            return abs(np.corrcoef(df[c].astype(float), yc.astype(float))[0, 1])
-        except Exception:
-            return 0.0
-    return sorted(num, key=lambda c: np.nan_to_num(corr(c)), reverse=True)
+    if task == "classification":
+        score = {c: _corr_ratio(y, df[c]) for c in num}
+    else:
+        def pear(c):
+            try:
+                return abs(np.corrcoef(df[c].astype(float), y.astype(float))[0, 1])
+            except Exception:
+                return 0.0
+        score = {c: pear(c) for c in num}
+    return sorted(num, key=lambda c: np.nan_to_num(score[c]), reverse=True)
 
 
 def visualize(df, target=None, task=None):
     """Return a 2x2 Plotly dashboard chosen to fit the data and task."""
     task = task or detect_task(df, target)
     num = _numeric_feats(df, target)
-    ranked = _rank_by_target_corr(df, target, num)
+    ranked = _rank_features(df, target, num, task)
 
     titles = [f"target: {target}" if target else "first feature",
               "the key relationship", "feature correlations", "a closer look"]

@@ -1,6 +1,6 @@
 # firstlook
 
-Drop in any dataframe — get models to try and the right charts, instantly. The first look you take at any dataset, done for you.
+Drop in any dataframe and get models worth trying plus the right charts. The first look you take at any dataset, done for you.
 
 ```python
 import firstlook
@@ -9,15 +9,15 @@ firstlook.at(df, target="species")
 
 One call and you get three things back:
 
-1. **The problem type** — regression, classification, or clustering, inferred from the data.
-2. **Models to try** — ranked, with a one-line reason each, plus data-aware warnings (class imbalance, categoricals that need encoding, missing values, too few rows).
-3. **The right charts** — a dark, interactive Plotly dashboard that picks the chart per column: bar/histogram for the target, a scatter colored by class (or feature-vs-target for regression), a correlation heatmap, and a closer look.
+1. **The problem type:** regression, classification, or clustering, inferred from the data.
+2. **Models to try:** ranked, with a one-line reason each, plus data-aware warnings (class imbalance, categoricals that need encoding, missing values, too few rows).
+3. **The right charts:** a dark, interactive Plotly dashboard that picks the chart per column: bar/histogram for the target, a scatter colored by class (or feature-vs-target for regression), a correlation heatmap, and a closer look.
 
 It works in Jupyter (rich card + interactive charts render inline) and in plain scripts (prints the recommendation; `report.to_html("out.html")` for the visuals).
 
 ## Why
 
-Every project starts the same way: load the data, squint at it, remember which chart goes with which column, half-remember the sklearn cheat-sheet. `firstlook` does that opening move for you so you can get to the actual modeling — without writing a wall of matplotlib.
+Every project starts the same way: load the data, squint at it, remember which chart goes with which column, half-remember the sklearn cheat-sheet. `firstlook` does that opening move for you so you can get to the actual modeling without writing a wall of matplotlib.
 
 ## Install
 
@@ -46,7 +46,7 @@ report.task          # "classification"
 report.start         # "LogisticRegression"
 report.models        # [("LogisticRegression", "..."), ...]
 report.notes         # ["3 classes", ...]
-report.figure        # the Plotly figure — restyle or export it
+report.figure        # the Plotly figure (restyle or export it)
 report.to_html("iris.html")
 ```
 
@@ -58,7 +58,7 @@ firstlook.recommend(df, target="price")     # a Recommendation (task, start, mod
 firstlook.visualize(df, target="price")     # a Plotly figure
 ```
 
-The dark theme is also a registered Plotly template — use it on your own figures:
+The dark theme is also a registered Plotly template you can use on your own figures:
 
 ```python
 fig.update_layout(template="firstlook")
@@ -68,7 +68,7 @@ fig.update_layout(template="firstlook")
 
 ## Get a baseline score, too
 
-Pass `fit=True` and `firstlook` trains the recommended model and cross-validates it — so you don't just get a suggestion, you get a working number. Preprocessing (impute, scale, one-hot) is built in, so it fits straight on messy data:
+Pass `fit=True` and `firstlook` trains the recommended model and cross-validates it, so the recommendation comes with a real score attached. Preprocessing (impute, scale, one-hot) is built in, so it fits straight on messy data:
 
 ```python
 report = firstlook.at(df, target="price", fit=True)

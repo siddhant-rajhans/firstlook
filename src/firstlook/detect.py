@@ -28,6 +28,8 @@ def detect_task(df, target=None):
         return "classification"
 
     n, nun = len(y), y.nunique()
+    if nun == 2:
+        return "classification"  # binary is classification regardless of dtype/size
     if pd.api.types.is_float_dtype(y):
         return "classification" if (nun <= 10 and nun / n < 0.05) else "regression"
     # integer target
