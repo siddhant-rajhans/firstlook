@@ -26,6 +26,7 @@ dependencies = [
 [project.optional-dependencies]
 fit = ["scikit-learn>=1.1"]
 dev = ["pytest>=7", "scikit-learn>=1.1"]
+showcase = ["scikit-learn>=1.1", "matplotlib", "nbformat", "nbconvert", "ipykernel", "kaleido"]
 
 [project.urls]
 Homepage = "https://github.com/siddhant-rajhans/firstlook"
