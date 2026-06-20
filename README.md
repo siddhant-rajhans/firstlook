@@ -1,6 +1,11 @@
-# firstlook
+<p align="center">
+  <img src="https://cdn.jsdelivr.net/gh/siddhant-rajhans/firstlook@main/assets/logo.svg" alt="firstlook" width="420">
+</p>
 
-Drop in any dataframe and get models worth trying plus the right charts. The first look you take at any dataset, done for you.
+<p align="center">
+  Drop in any dataframe and get the models worth trying, plus the right charts.<br>
+  <em>The first look you take at any dataset — done for you.</em>
+</p>
 
 ```python
 import firstlook

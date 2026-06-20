@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="firstlook">
+  <title>firstlook</title>
+  <rect width="256" height="256" rx="58" fill="#080814"/>
+  <circle cx="128" cy="128" r="116" fill="#00E5FF" opacity="0.05"/>
+  <circle cx="128" cy="128" r="74" fill="none" stroke="#00E5FF" stroke-width="17"/>
+  <polyline points="78,162 110,138 140,150 178,94" fill="none" stroke="#FFD27F" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="178" cy="94" r="14" fill="#FF4081"/>
+</svg>
