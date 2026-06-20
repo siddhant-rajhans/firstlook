@@ -15,6 +15,8 @@ One call and you get three things back:
 
 It works in Jupyter (rich card + interactive charts render inline) and in plain scripts (prints the recommendation; `report.to_html("out.html")` for the visuals).
 
+**See it on real data:** [`examples/`](examples/) runs the full understand → visualize → model arc on three datasets — breast cancer, diabetes, and a messy churn set — with the dashboards rendered.
+
 ## Why
 
 Every project starts the same way: load the data, squint at it, remember which chart goes with which column, half-remember the sklearn cheat-sheet. `firstlook` does that opening move for you so you can get to the actual modeling without writing a wall of matplotlib.

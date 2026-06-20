@@ -70,14 +70,16 @@ def fit_baseline(df, target, task):
         if per_class < 2:
             return Baseline("LogisticRegression", "accuracy", None,
                             note="a class has <2 samples; can't cross-validate")
-        model = LogisticRegression(max_iter=1000)
         name = "LogisticRegression"
         cv = min(5, max(2, per_class))
         # plain accuracy flatters imbalanced data (a majority-only guesser scores
-        # high), so switch to balanced accuracy exactly when imbalance is flagged.
+        # high), so on imbalance we both weight the classes (the tool's own advice)
+        # and score with balanced accuracy. Otherwise plain LogisticRegression + accuracy.
         if (vc.max() / len(y)) > 0.7:
+            model = LogisticRegression(max_iter=1000, class_weight="balanced")
             metric, scoring = "balanced accuracy", "balanced_accuracy"
         else:
+            model = LogisticRegression(max_iter=1000)
             metric, scoring = "accuracy", "accuracy"
 
     pipe = Pipeline([("pre", pre), ("model", model)])
