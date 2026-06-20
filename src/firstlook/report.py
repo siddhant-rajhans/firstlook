@@ -8,6 +8,7 @@ from .visualize import visualize, _numeric_feats, _rank_features
 from .baseline import fit_baseline, Baseline
 from .leaderboard import leaderboard as _run_leaderboard
 from .explain import explain as _run_explain, Narrative
+from .diagnose import diagnose as _run_diagnose, Diagnosis
 
 
 def _in_notebook():
@@ -44,8 +45,24 @@ def _leaderboard_html(lb, accent):
     )
 
 
-def _card_html(title, rec, shape, target, baseline=None, lb=None, narrative=None):
+def _findings_html(diag, accent):
+    if diag is None or not getattr(diag, "findings", None):
+        return ""
+    dot = {"high": theme.PINK, "medium": theme.GOLD, "low": "#8a8aa0"}
+    rows = ""
+    for f in diag.findings:
+        sug = f' <span style="color:#8a8aa0">- {f.suggestion}</span>' if f.suggestion else ""
+        rows += ('<div style="margin:4px 0;font-size:13px;color:#cfcfe0">'
+                 f'<span style="color:{dot.get(f.severity, "#8a8aa0")}">&#9679;</span> '
+                 f'{f.message}{sug}</div>')
+    return ('<div style="margin-top:14px"><div style="font-size:12px;letter-spacing:.1em;'
+            'text-transform:uppercase;color:#8a8aa0;margin-bottom:6px">data doctor</div>'
+            f'{rows}</div>')
+
+
+def _card_html(title, rec, shape, target, baseline=None, lb=None, narrative=None, diagnosis=None):
     accent = theme.ACCENT.get(rec.task, theme.CYAN)
+    diag = _findings_html(diagnosis, accent)
     narr = ""
     if narrative is not None and getattr(narrative, "text", ""):
         safe = (narrative.text.replace("&", "&amp;").replace("<", "&lt;")
@@ -89,7 +106,7 @@ def _card_html(title, rec, shape, target, baseline=None, lb=None, narrative=None
   <div><div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#8a8aa0;
     margin-bottom:8px">watch out for</div>
    <ul style="list-style:none;margin:0;padding:0;font-size:13.5px;line-height:1.5">{notes}</ul></div>
- </div>{base}</div>"""
+ </div>{base}{diag}</div>"""
 
 
 @dataclass
@@ -104,6 +121,7 @@ class Report:
     leaderboard: object = None
     narrative: object = None
     key_features: list = field(default_factory=list)
+    diagnosis: object = None
 
     @property
     def start(self):
@@ -127,7 +145,7 @@ class Report:
         if _in_notebook():
             from IPython.display import HTML, display
             display(HTML(_card_html(self.title, self.recommendation, self.shape,
-                                    self.target, self.baseline, self.leaderboard, self.narrative)))
+                                    self.target, self.baseline, self.leaderboard, self.narrative, self.diagnosis)))
             self.figure.show()
         else:
             print(self.title)
@@ -138,6 +156,8 @@ class Report:
                 print("\n" + str(self.leaderboard))
             elif self.baseline is not None:
                 print("\n" + str(self.baseline))
+            if self.diagnosis is not None and self.diagnosis.findings:
+                print("\n" + str(self.diagnosis))
         return self
 
     def to_html(self, path):
@@ -145,7 +165,7 @@ class Report:
         chart = self.figure.to_html(full_html=False, include_plotlyjs="cdn",
                                     config={"displayModeBar": False})
         card = _card_html(self.title, self.recommendation, self.shape, self.target,
-                          self.baseline, self.leaderboard, self.narrative)
+                          self.baseline, self.leaderboard, self.narrative, self.diagnosis)
         with open(path, "w", encoding="utf-8") as f:
             f.write(f'<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{self.title}</title></head>'
                     f'<body style="margin:0;background:{theme.BG}">'
@@ -155,7 +175,7 @@ class Report:
 
     def _repr_html_(self):
         return _card_html(self.title, self.recommendation, self.shape, self.target,
-                          self.baseline, self.leaderboard, self.narrative)
+                          self.baseline, self.leaderboard, self.narrative, self.diagnosis)
 
 
 def _resolve_fit(fit):
@@ -180,7 +200,7 @@ def _baseline_from_leaderboard(lb):
                     std=best.std, cv=lb.cv)
 
 
-def play(df, target=None, title=None, show=True, fit=False, explain=False):
+def play(df, target=None, title=None, show=True, fit=False, explain=False, diagnose=False):
     """Inspect ``df``: detect the task, recommend models, and chart the data.
 
     ``fit=True`` cross-validates the single recommended baseline; ``fit="all"``
@@ -221,6 +241,13 @@ def play(df, target=None, title=None, show=True, fit=False, explain=False):
         except Exception as e:  # never let narration break the report
             import warnings
             warnings.warn(f"explain= skipped: {e}")
+
+    if diagnose:
+        try:
+            report.diagnosis = _run_diagnose(df, target, task)
+        except Exception as e:  # never let diagnostics break the report
+            import warnings
+            warnings.warn(f"diagnose= skipped: {e}")
 
     if show:
         report.show()

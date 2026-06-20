@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "firstlook"
-version = "0.3.0"
+version = "0.4.0"
 description = "Drop in any dataframe and get models worth trying plus the right charts."
 readme = "README.md"
 requires-python = ">=3.9"
