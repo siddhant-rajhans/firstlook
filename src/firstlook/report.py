@@ -1,10 +1,11 @@
-"""``play()`` — the one call that ties detection, recommendation and charts together."""
+"""``play()`` / ``at()`` — the one call that ties it all together."""
 from dataclasses import dataclass
 
 from . import theme
 from .detect import detect_task
 from .recommend import recommend, Recommendation
 from .visualize import visualize
+from .baseline import fit_baseline, Baseline
 
 
 def _in_notebook():
@@ -16,13 +17,22 @@ def _in_notebook():
         return False
 
 
-def _card_html(title, rec, shape, target):
+def _card_html(title, rec, shape, target, baseline=None):
     accent = theme.ACCENT.get(rec.task, theme.CYAN)
     models = "".join(
         f'<li><span style="color:{theme.CYAN};font-family:monospace;font-weight:600">{m}</span>'
         f' <span style="color:#b9b9cc">{r}</span></li>' for m, r in rec.models)
     notes = "".join(f'<li style="color:#cfcfe0"><span style="color:{accent}">&rarr; </span>{n}</li>'
                     for n in rec.notes) or '<li style="color:#cfcfe0">clean and ready to model.</li>'
+    base = ""
+    if baseline is not None and baseline.score is not None:
+        base = (f'<div style="margin-top:14px;padding:10px 14px;background:#11112a;border-radius:8px;'
+                f'font-size:13.5px"><span style="color:#8a8aa0">baseline</span> &nbsp;'
+                f'<span style="color:{theme.CYAN};font-family:monospace">{baseline.model}</span> &middot; '
+                f'{baseline.metric} <span style="color:{accent};font-weight:700">{baseline.score:.3f}</span> '
+                f'<span style="color:#8a8aa0">&plusmn;{baseline.std:.3f} ({baseline.cv}-fold CV)</span></div>')
+    elif baseline is not None and baseline.note:
+        base = f'<div style="margin-top:14px;font-size:13px;color:#8a8aa0">baseline: {baseline.note}</div>'
     return f"""<div style="background:{theme.BG};color:{theme.INK};font-family:Inter,system-ui,sans-serif;
  border-radius:12px;padding:18px 20px;max-width:680px">
  <div style="font-size:20px;font-weight:800;letter-spacing:-.02em">{title}</div>
@@ -39,7 +49,7 @@ def _card_html(title, rec, shape, target):
   <div><div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#8a8aa0;
     margin-bottom:8px">watch out for</div>
    <ul style="list-style:none;margin:0;padding:0;font-size:13.5px;line-height:1.5">{notes}</ul></div>
- </div></div>"""
+ </div>{base}</div>"""
 
 
 @dataclass
@@ -50,6 +60,7 @@ class Report:
     figure: object
     shape: tuple
     target: str
+    baseline: object = None
 
     @property
     def start(self):
@@ -67,18 +78,20 @@ class Report:
         """Render in a notebook (rich card + interactive charts) or print (scripts)."""
         if _in_notebook():
             from IPython.display import HTML, display
-            display(HTML(_card_html(self.title, self.recommendation, self.shape, self.target)))
+            display(HTML(_card_html(self.title, self.recommendation, self.shape, self.target, self.baseline)))
             self.figure.show()
         else:
             print(self.title)
             print(self.recommendation)
+            if self.baseline is not None:
+                print("\n" + str(self.baseline))
         return self
 
     def to_html(self, path):
         """Write a standalone dark dashboard (recommendations + charts) to ``path``."""
         chart = self.figure.to_html(full_html=False, include_plotlyjs="cdn",
                                     config={"displayModeBar": False})
-        card = _card_html(self.title, self.recommendation, self.shape, self.target)
+        card = _card_html(self.title, self.recommendation, self.shape, self.target, self.baseline)
         with open(path, "w", encoding="utf-8") as f:
             f.write(f'<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{self.title}</title></head>'
                     f'<body style="margin:0;background:{theme.BG}">'
@@ -87,20 +100,24 @@ class Report:
         return path
 
     def _repr_html_(self):
-        return _card_html(self.title, self.recommendation, self.shape, self.target)
+        return _card_html(self.title, self.recommendation, self.shape, self.target, self.baseline)
 
 
-def play(df, target=None, title=None, show=True):
+def play(df, target=None, title=None, show=True, fit=False):
     """Inspect ``df``: detect the task, recommend models, and chart the data.
 
-    Returns a :class:`Report` (``.task``, ``.models``, ``.notes``, ``.figure``,
-    ``.to_html(path)``). In a notebook it also displays a card and the charts.
+    Set ``fit=True`` to also cross-validate the recommended baseline model and
+    report a score (needs scikit-learn: ``pip install 'firstlook[fit]'``).
+
+    Returns a :class:`Report` (``.task``, ``.start``, ``.models``, ``.notes``,
+    ``.figure``, ``.baseline``, ``.to_html(path)``).
     """
     task = detect_task(df, target)
     rec = recommend(df, target, task)
     fig = visualize(df, target, task)
+    baseline = fit_baseline(df, target, task) if fit else None
     report = Report(title=title or "your data", task=task, recommendation=rec,
-                    figure=fig, shape=df.shape, target=target)
+                    figure=fig, shape=df.shape, target=target, baseline=baseline)
     if show:
         report.show()
     return report

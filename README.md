@@ -66,15 +66,26 @@ fig.update_layout(template="firstlook")
 
 (`firstlook.at` and `firstlook.play` are the same call.)
 
+## Get a baseline score, too
+
+Pass `fit=True` and `firstlook` trains the recommended model and cross-validates it — so you don't just get a suggestion, you get a working number. Preprocessing (impute, scale, one-hot) is built in, so it fits straight on messy data:
+
+```python
+report = firstlook.at(df, target="price", fit=True)
+report.baseline      # Baseline(model="LinearRegression", metric="R2", score=0.97, ...)
+```
+
+Needs scikit-learn: `pip install "firstlook[fit]"`.
+
 ## What it handles today
 
 Tabular regression, classification, and clustering. Image / text / time-series problems are out of scope for now.
 
 ## Roadmap
 
-- A quick baseline fit (train the recommended model, report a score) behind an optional `scikit-learn` extra.
 - More chart types (pair plots, missingness maps, target-vs-time).
 - A light/lab theme alongside the dark one.
+- Image / text / time-series support beyond tabular.
 
 ## License
 
