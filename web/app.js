@@ -1,6 +1,6 @@
 // firstlook browser playground — runs the real firstlook in Pyodide (WASM).
 // WHEEL must match the version built into web/ (the pages workflow builds it).
-const WHEEL = "firstlook-0.4.0-py3-none-any.whl";
+const WHEEL = "firstlook-0.5.0-py3-none-any.whl";
 
 const $ = (id) => document.getElementById(id);
 const status = (m) => { $("status").textContent = m; };

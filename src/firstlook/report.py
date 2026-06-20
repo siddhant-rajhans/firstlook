@@ -122,6 +122,7 @@ class Report:
     narrative: object = None
     key_features: list = field(default_factory=list)
     diagnosis: object = None
+    descent: object = None
 
     @property
     def start(self):
@@ -147,6 +148,8 @@ class Report:
             display(HTML(_card_html(self.title, self.recommendation, self.shape,
                                     self.target, self.baseline, self.leaderboard, self.narrative, self.diagnosis)))
             self.figure.show()
+            if self.descent is not None and self.descent.figure is not None:
+                self.descent.figure.show()
         else:
             print(self.title)
             if self.narrative is not None:
@@ -158,6 +161,8 @@ class Report:
                 print("\n" + str(self.baseline))
             if self.diagnosis is not None and self.diagnosis.findings:
                 print("\n" + str(self.diagnosis))
+            if self.descent is not None:
+                print("\n" + str(self.descent))
         return self
 
     def to_html(self, path):
@@ -166,16 +171,23 @@ class Report:
                                     config={"displayModeBar": False})
         card = _card_html(self.title, self.recommendation, self.shape, self.target,
                           self.baseline, self.leaderboard, self.narrative, self.diagnosis)
+        extra = ""
+        if self.descent is not None and self.descent.figure is not None:
+            extra = self.descent.figure.to_html(full_html=False, include_plotlyjs=False,
+                                                config={"displayModeBar": False})
         with open(path, "w", encoding="utf-8") as f:
             f.write(f'<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{self.title}</title></head>'
                     f'<body style="margin:0;background:{theme.BG}">'
-                    f'<div style="max-width:1080px;margin:0 auto;padding:24px">{card}{chart}</div>'
+                    f'<div style="max-width:1080px;margin:0 auto;padding:24px">{card}{chart}{extra}</div>'
                     f"</body></html>")
         return path
 
     def _repr_html_(self):
-        return _card_html(self.title, self.recommendation, self.shape, self.target,
+        html = _card_html(self.title, self.recommendation, self.shape, self.target,
                           self.baseline, self.leaderboard, self.narrative, self.diagnosis)
+        if self.descent is not None and self.descent.figure is not None:
+            html += self.descent._repr_html_()
+        return html
 
 
 def _resolve_fit(fit):
@@ -200,7 +212,7 @@ def _baseline_from_leaderboard(lb):
                     std=best.std, cv=lb.cv)
 
 
-def play(df, target=None, title=None, show=True, fit=False, explain=False, diagnose=False):
+def play(df, target=None, title=None, show=True, fit=False, explain=False, diagnose=False, descent=False):
     """Inspect ``df``: detect the task, recommend models, and chart the data.
 
     ``fit=True`` cross-validates the single recommended baseline; ``fit="all"``
@@ -248,6 +260,14 @@ def play(df, target=None, title=None, show=True, fit=False, explain=False, diagn
         except Exception as e:  # never let diagnostics break the report
             import warnings
             warnings.warn(f"diagnose= skipped: {e}")
+
+    if descent:
+        try:
+            from .descent import descent as _run_descent
+            report.descent = _run_descent(df, target, show=False)
+        except Exception as e:  # never let the loss surface break the report
+            import warnings
+            warnings.warn(f"descent= skipped: {e}")
 
     if show:
         report.show()

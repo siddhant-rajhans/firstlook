@@ -117,6 +117,20 @@ report = firstlook.at(df, target="y", diagnose=True)
 report.diagnosis     # Diagnosis(findings=[Finding(kind="leakage", severity="high", ...), ...])
 ```
 
+## See gradient descent
+
+`descent=True` draws the picture every ML course sketches by hand — the 3-D loss surface, the path gradient descent takes down it, and the loss-per-step curve — fit live on your data. It trains a tiny two-parameter model (bias + the feature most tied to the target) so the loss is a real surface: linear regression / MSE for a regression target, logistic regression / log-loss for a binary one.
+
+```python
+report = firstlook.at(df, target="price", descent=True)
+report.descent                                    # Descent(model="linear regression", final_loss=..., ...)
+
+firstlook.descent(df, target="price")             # or call it on its own
+firstlook.descent(df, target="y", feature="age")  # pick which parameter to vary
+```
+
+Pure numpy — no scikit-learn needed. The surface is a clean convex bowl because that's the honest shape of a linear/logistic loss; the bumpy landscapes you've seen elsewhere belong to deep nets.
+
 ## What it handles today
 
 Tabular regression, classification, and clustering. Image / text / time-series problems are out of scope for now.

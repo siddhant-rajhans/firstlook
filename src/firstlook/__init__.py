@@ -16,14 +16,15 @@ from .baseline import fit_baseline, Baseline
 from .leaderboard import leaderboard, Leaderboard, Entry
 from .explain import explain, Narrative, Completer
 from .diagnose import diagnose, Diagnosis, Finding
+from .descent import descent, Descent
 from .theme import THEME
 
 at = play  # headline alias: firstlook.at(df, target=...)
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 __all__ = [
     "at", "play", "recommend", "visualize", "detect_task", "fit_baseline",
-    "leaderboard", "explain", "diagnose", "Report", "Recommendation", "Baseline",
-    "Leaderboard", "Entry", "Narrative", "Completer", "Diagnosis", "Finding",
-    "THEME", "__version__",
+    "leaderboard", "explain", "diagnose", "descent", "Report", "Recommendation",
+    "Baseline", "Leaderboard", "Entry", "Narrative", "Completer", "Diagnosis",
+    "Finding", "Descent", "THEME", "__version__",
 ]
