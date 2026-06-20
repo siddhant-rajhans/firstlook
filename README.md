@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://cdn.jsdelivr.net/gh/siddhant-rajhans/firstlook@main/assets/logo.svg" alt="firstlook" width="420">
+  <img src="https://cdn.jsdelivr.net/gh/siddhant-rajhans/firstlook@main/assets/logo.svg?v=2" alt="firstlook" width="440">
 </p>
 
 <p align="center">
