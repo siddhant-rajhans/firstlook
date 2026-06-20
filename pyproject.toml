@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "firstlook"
+version = "0.1.0"
+description = "Drop in any dataframe — get models to try and the right charts, instantly."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Siddhant Rajhans" }]
+keywords = ["eda", "automl", "visualization", "plotly", "data-science", "machine-learning"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+    "pandas>=1.5",
+    "numpy>=1.23",
+    "plotly>=5.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "scikit-learn>=1.1"]
+
+[project.urls]
+Homepage = "https://github.com/siddhant-rajhans/firstlook"
+Issues = "https://github.com/siddhant-rajhans/firstlook/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
