@@ -1,12 +1,13 @@
 """``play()`` / ``at()`` — the one call that ties it all together."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import theme
 from .detect import detect_task
 from .recommend import recommend, Recommendation
-from .visualize import visualize
+from .visualize import visualize, _numeric_feats, _rank_features
 from .baseline import fit_baseline, Baseline
 from .leaderboard import leaderboard as _run_leaderboard
+from .explain import explain as _run_explain, Narrative
 
 
 def _in_notebook():
@@ -43,8 +44,18 @@ def _leaderboard_html(lb, accent):
     )
 
 
-def _card_html(title, rec, shape, target, baseline=None, lb=None):
+def _card_html(title, rec, shape, target, baseline=None, lb=None, narrative=None):
     accent = theme.ACCENT.get(rec.task, theme.CYAN)
+    narr = ""
+    if narrative is not None and getattr(narrative, "text", ""):
+        safe = (narrative.text.replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;").replace(chr(10), "<br>"))
+        prov = (f' &middot; <span style="color:#6a6a86">{narrative.model}</span>'
+                if narrative.model else "")
+        narr = (f'<div style="margin:0 0 14px;padding:12px 14px;border-left:3px solid {theme.CYAN};'
+                f'background:#0f0f22;border-radius:0 8px 8px 0;font-size:13.5px;color:#cfcfe0">'
+                f'<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;'
+                f'color:#8a8aa0;margin-bottom:6px">AI summary{prov}</div>{safe}</div>')
     models = "".join(
         f'<li><span style="color:{theme.CYAN};font-family:monospace;font-weight:600">{m}</span>'
         f' <span style="color:#b9b9cc">{r}</span></li>' for m, r in rec.models)
@@ -69,7 +80,7 @@ def _card_html(title, rec, shape, target, baseline=None, lb=None):
    <span style="background:{accent};color:#08080f;font-weight:700;font-size:11px;padding:3px 11px;
     border-radius:999px;text-transform:uppercase;letter-spacing:.08em">{rec.task}</span>
    &nbsp; {shape[0]} rows &middot; {shape[1]} cols &middot; target: <code>{target}</code></div>
- <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+ {narr}<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
   <div><div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#8a8aa0;
     margin-bottom:8px">models to try</div>
    <ul style="list-style:none;margin:0;padding:0;font-size:13.5px;line-height:1.5">{models}</ul>
@@ -91,10 +102,17 @@ class Report:
     target: str
     baseline: object = None
     leaderboard: object = None
+    narrative: object = None
+    key_features: list = field(default_factory=list)
 
     @property
     def start(self):
         return self.recommendation.start
+
+    def explain(self, using=None, max_features=5):
+        """Narrate this report with any LLM; store and return the Narrative."""
+        self.narrative = _run_explain(self, using=using, max_features=max_features)
+        return self.narrative
 
     @property
     def models(self):
@@ -109,10 +127,12 @@ class Report:
         if _in_notebook():
             from IPython.display import HTML, display
             display(HTML(_card_html(self.title, self.recommendation, self.shape,
-                                    self.target, self.baseline, self.leaderboard)))
+                                    self.target, self.baseline, self.leaderboard, self.narrative)))
             self.figure.show()
         else:
             print(self.title)
+            if self.narrative is not None:
+                print("\n" + str(self.narrative) + "\n")
             print(self.recommendation)
             if self.leaderboard is not None and getattr(self.leaderboard, "entries", None):
                 print("\n" + str(self.leaderboard))
@@ -125,7 +145,7 @@ class Report:
         chart = self.figure.to_html(full_html=False, include_plotlyjs="cdn",
                                     config={"displayModeBar": False})
         card = _card_html(self.title, self.recommendation, self.shape, self.target,
-                          self.baseline, self.leaderboard)
+                          self.baseline, self.leaderboard, self.narrative)
         with open(path, "w", encoding="utf-8") as f:
             f.write(f'<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{self.title}</title></head>'
                     f'<body style="margin:0;background:{theme.BG}">'
@@ -135,7 +155,7 @@ class Report:
 
     def _repr_html_(self):
         return _card_html(self.title, self.recommendation, self.shape, self.target,
-                          self.baseline, self.leaderboard)
+                          self.baseline, self.leaderboard, self.narrative)
 
 
 def _resolve_fit(fit):
@@ -160,19 +180,27 @@ def _baseline_from_leaderboard(lb):
                     std=best.std, cv=lb.cv)
 
 
-def play(df, target=None, title=None, show=True, fit=False):
+def play(df, target=None, title=None, show=True, fit=False, explain=False):
     """Inspect ``df``: detect the task, recommend models, and chart the data.
 
     ``fit=True`` cross-validates the single recommended baseline; ``fit="all"``
     fits and ranks a whole model panel (a leaderboard). Both need scikit-learn
     (``pip install 'firstlook[fit]'``).
 
+    ``explain=`` adds a plain-English narrative from any LLM: ``True`` auto-detects
+    one (env vars / local Ollama), or pass a ``"provider:model"`` string, a config
+    dict, or your own ``(prompt) -> text`` callable. A failed narration degrades to
+    ``None`` rather than raising.
+
     Returns a :class:`Report` (``.task``, ``.start``, ``.models``, ``.notes``,
-    ``.figure``, ``.baseline``, ``.leaderboard``, ``.to_html(path)``).
+    ``.figure``, ``.baseline``, ``.leaderboard``, ``.narrative``, ``.to_html(path)``).
     """
     task = detect_task(df, target)
     rec = recommend(df, target, task)
     fig = visualize(df, target, task)
+
+    num = _numeric_feats(df, target)
+    key_features = _rank_features(df, target, num, task)[:5] if num else []
 
     baseline = lb = None
     mode = _resolve_fit(fit)
@@ -184,7 +212,16 @@ def play(df, target=None, title=None, show=True, fit=False):
 
     report = Report(title=title or "your data", task=task, recommendation=rec,
                     figure=fig, shape=df.shape, target=target,
-                    baseline=baseline, leaderboard=lb)
+                    baseline=baseline, leaderboard=lb, key_features=key_features)
+
+    if explain not in (False, None):
+        using = None if explain is True else explain
+        try:
+            report.narrative = _run_explain(report, using=using)
+        except Exception as e:  # never let narration break the report
+            import warnings
+            warnings.warn(f"explain= skipped: {e}")
+
     if show:
         report.show()
     return report
