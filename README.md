@@ -7,6 +7,13 @@
   <em>The first look you take at any dataset — done for you.</em>
 </p>
 
+<p align="center">
+  <a href="https://pypi.org/project/firstlook/"><img src="https://img.shields.io/pypi/v/firstlook?style=flat-square&color=00B8D4" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/firstlook/"><img src="https://img.shields.io/pypi/pyversions/firstlook?style=flat-square&color=1E88E5" alt="Python versions"></a>
+  <a href="https://github.com/siddhant-rajhans/firstlook/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/siddhant-rajhans/firstlook/ci.yml?branch=main&style=flat-square&label=tests" alt="CI"></a>
+  <img src="https://img.shields.io/badge/license-MIT-success?style=flat-square" alt="MIT license">
+</p>
+
 ```python
 import firstlook
 firstlook.at(df, target="species")
