@@ -6,6 +6,7 @@ from .detect import detect_task
 from .recommend import recommend, Recommendation
 from .visualize import visualize
 from .baseline import fit_baseline, Baseline
+from .leaderboard import leaderboard as _run_leaderboard
 
 
 def _in_notebook():
@@ -17,15 +18,41 @@ def _in_notebook():
         return False
 
 
-def _card_html(title, rec, shape, target, baseline=None):
+def _leaderboard_html(lb, accent):
+    if lb is None or not getattr(lb, "entries", None):
+        return ""
+    scores = [e.score for e in lb.entries]
+    lo, hi = min(scores), max(scores)
+    span = (hi - lo) if hi > lo else 1.0
+    rows = ""
+    for e in lb.entries:
+        w = 6 + 94 * (e.score - lo) / span
+        bar_color = accent if e.rank == 1 else "#6a6a86"
+        rows += (
+            '<div style="display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px">'
+            f'<span style="color:#8a8aa0;width:12px">{e.rank}</span>'
+            f'<span style="font-family:monospace;color:{theme.INK};width:170px">{e.model}</span>'
+            '<span style="flex:1;background:#11112a;border-radius:4px;overflow:hidden">'
+            f'<span style="display:block;height:8px;width:{w:.0f}%;background:{bar_color}"></span></span>'
+            f'<span style="color:{theme.INK};width:52px;text-align:right">{e.score:.3f}</span></div>'
+        )
+    return (
+        '<div style="margin-top:14px"><div style="font-size:12px;letter-spacing:.1em;'
+        'text-transform:uppercase;color:#8a8aa0;margin-bottom:6px">leaderboard &middot; '
+        f'{lb.metric} ({lb.cv}-fold CV)</div>{rows}</div>'
+    )
+
+
+def _card_html(title, rec, shape, target, baseline=None, lb=None):
     accent = theme.ACCENT.get(rec.task, theme.CYAN)
     models = "".join(
         f'<li><span style="color:{theme.CYAN};font-family:monospace;font-weight:600">{m}</span>'
         f' <span style="color:#b9b9cc">{r}</span></li>' for m, r in rec.models)
     notes = "".join(f'<li style="color:#cfcfe0"><span style="color:{accent}">&rarr; </span>{n}</li>'
                     for n in rec.notes) or '<li style="color:#cfcfe0">clean and ready to model.</li>'
-    base = ""
-    if baseline is not None and baseline.score is not None:
+    if lb is not None and getattr(lb, "entries", None):
+        base = _leaderboard_html(lb, accent)
+    elif baseline is not None and baseline.score is not None:
         base = (f'<div style="margin-top:14px;padding:10px 14px;background:#11112a;border-radius:8px;'
                 f'font-size:13.5px"><span style="color:#8a8aa0">baseline</span> &nbsp;'
                 f'<span style="color:{theme.CYAN};font-family:monospace">{baseline.model}</span> &middot; '
@@ -33,6 +60,8 @@ def _card_html(title, rec, shape, target, baseline=None):
                 f'<span style="color:#8a8aa0">&plusmn;{baseline.std:.3f} ({baseline.cv}-fold CV)</span></div>')
     elif baseline is not None and baseline.note:
         base = f'<div style="margin-top:14px;font-size:13px;color:#8a8aa0">baseline: {baseline.note}</div>'
+    else:
+        base = ""
     return f"""<div style="background:{theme.BG};color:{theme.INK};font-family:Inter,system-ui,sans-serif;
  border-radius:12px;padding:18px 20px;max-width:680px">
  <div style="font-size:20px;font-weight:800;letter-spacing:-.02em">{title}</div>
@@ -61,6 +90,7 @@ class Report:
     shape: tuple
     target: str
     baseline: object = None
+    leaderboard: object = None
 
     @property
     def start(self):
@@ -78,12 +108,15 @@ class Report:
         """Render in a notebook (rich card + interactive charts) or print (scripts)."""
         if _in_notebook():
             from IPython.display import HTML, display
-            display(HTML(_card_html(self.title, self.recommendation, self.shape, self.target, self.baseline)))
+            display(HTML(_card_html(self.title, self.recommendation, self.shape,
+                                    self.target, self.baseline, self.leaderboard)))
             self.figure.show()
         else:
             print(self.title)
             print(self.recommendation)
-            if self.baseline is not None:
+            if self.leaderboard is not None and getattr(self.leaderboard, "entries", None):
+                print("\n" + str(self.leaderboard))
+            elif self.baseline is not None:
                 print("\n" + str(self.baseline))
         return self
 
@@ -91,7 +124,8 @@ class Report:
         """Write a standalone dark dashboard (recommendations + charts) to ``path``."""
         chart = self.figure.to_html(full_html=False, include_plotlyjs="cdn",
                                     config={"displayModeBar": False})
-        card = _card_html(self.title, self.recommendation, self.shape, self.target, self.baseline)
+        card = _card_html(self.title, self.recommendation, self.shape, self.target,
+                          self.baseline, self.leaderboard)
         with open(path, "w", encoding="utf-8") as f:
             f.write(f'<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{self.title}</title></head>'
                     f'<body style="margin:0;background:{theme.BG}">'
@@ -100,24 +134,57 @@ class Report:
         return path
 
     def _repr_html_(self):
-        return _card_html(self.title, self.recommendation, self.shape, self.target, self.baseline)
+        return _card_html(self.title, self.recommendation, self.shape, self.target,
+                          self.baseline, self.leaderboard)
+
+
+def _resolve_fit(fit):
+    """Map the ``fit`` argument to None | 'baseline' | 'all'."""
+    if fit in (False, None):
+        return None
+    if fit is True or fit == "baseline":
+        return "baseline"
+    if fit in ("all", "leaderboard"):
+        return "all"
+    return None
+
+
+def _baseline_from_leaderboard(lb):
+    """Synthesize a Baseline from the leaderboard winner so .baseline stays populated."""
+    if lb is None:
+        return None
+    if not lb.entries:
+        return Baseline(None, None, None, note=lb.note)
+    best = lb.best
+    return Baseline(model=best.model, metric=lb.metric, score=best.score,
+                    std=best.std, cv=lb.cv)
 
 
 def play(df, target=None, title=None, show=True, fit=False):
     """Inspect ``df``: detect the task, recommend models, and chart the data.
 
-    Set ``fit=True`` to also cross-validate the recommended baseline model and
-    report a score (needs scikit-learn: ``pip install 'firstlook[fit]'``).
+    ``fit=True`` cross-validates the single recommended baseline; ``fit="all"``
+    fits and ranks a whole model panel (a leaderboard). Both need scikit-learn
+    (``pip install 'firstlook[fit]'``).
 
     Returns a :class:`Report` (``.task``, ``.start``, ``.models``, ``.notes``,
-    ``.figure``, ``.baseline``, ``.to_html(path)``).
+    ``.figure``, ``.baseline``, ``.leaderboard``, ``.to_html(path)``).
     """
     task = detect_task(df, target)
     rec = recommend(df, target, task)
     fig = visualize(df, target, task)
-    baseline = fit_baseline(df, target, task) if fit else None
+
+    baseline = lb = None
+    mode = _resolve_fit(fit)
+    if mode == "baseline":
+        baseline = fit_baseline(df, target, task)
+    elif mode == "all":
+        lb = _run_leaderboard(df, target, task)
+        baseline = _baseline_from_leaderboard(lb)
+
     report = Report(title=title or "your data", task=task, recommendation=rec,
-                    figure=fig, shape=df.shape, target=target, baseline=baseline)
+                    figure=fig, shape=df.shape, target=target,
+                    baseline=baseline, leaderboard=lb)
     if show:
         report.show()
     return report

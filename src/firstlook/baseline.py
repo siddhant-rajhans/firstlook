@@ -1,12 +1,13 @@
 """Train the recommended baseline model and report an honest score.
 
-Needs scikit-learn (the ``fit`` / ``dev`` extra). Preprocessing is built into
-the pipeline (median-impute + scale numerics, most-frequent-impute + one-hot
-categoricals), so it fits straight on the messy data the recommender only warns
-about. Scoring is cross-validated, so a tiny test split can't flatter or wreck it.
+Needs scikit-learn (the ``fit`` / ``dev`` extra). Preprocessing, the honest
+metric rule, and CV folds all come from ``_sklearn`` so the single baseline and
+the leaderboard stay in lock-step.
 """
 from dataclasses import dataclass
 from typing import Optional
+
+from . import _sklearn
 
 
 @dataclass
@@ -29,58 +30,29 @@ def fit_baseline(df, target, task):
     """Cross-validate the recommended start model; return a :class:`Baseline`."""
     if task == "clustering" or target is None:
         return Baseline(None, None, None, note="no target, nothing to fit")
-    try:
-        from sklearn.linear_model import LinearRegression, LogisticRegression
-        from sklearn.model_selection import cross_val_score
-        from sklearn.pipeline import Pipeline
-        from sklearn.compose import ColumnTransformer
-        from sklearn.preprocessing import OneHotEncoder, StandardScaler
-        from sklearn.impute import SimpleImputer
-    except ImportError as e:
-        raise ImportError(
-            "baseline fitting needs scikit-learn; install it with "
-            "`pip install 'firstlook[fit]'`"
-        ) from e
+    _sklearn._require_sklearn()
 
     data = df.dropna(subset=[target])
     y = data[target]
     X = data.drop(columns=[target])
-    n = len(data)
-    if n < 10 or X.shape[1] == 0:
-        return Baseline(None, None, None, note="too few rows to score reliably")
+    guard = _sklearn.fit_guard(X, y, task)
+    if guard:
+        return Baseline(None, None, None, note=guard)
 
-    num = X.select_dtypes(include="number").columns.tolist()
-    cat = [c for c in X.columns if c not in num]
-    pre = ColumnTransformer(
-        transformers=[
-            ("num", Pipeline([("imp", SimpleImputer(strategy="median")),
-                              ("sc", StandardScaler())]), num),
-            ("cat", Pipeline([("imp", SimpleImputer(strategy="most_frequent")),
-                              ("oh", OneHotEncoder(handle_unknown="ignore"))]), cat),
-        ],
-        remainder="drop",
-    )
+    from sklearn.linear_model import LinearRegression, LogisticRegression
+    from sklearn.model_selection import cross_val_score
+    from sklearn.pipeline import Pipeline
+
+    pre, _, _ = _sklearn.build_preprocessor(X)
+    metric, scoring = _sklearn.scoring_for(task, y)
+    cv = _sklearn.cv_for(task, y)
 
     if task == "regression":
-        model, name, metric, scoring = LinearRegression(), "LinearRegression", "R2", "r2"
-        cv = min(5, max(2, n // 4))
+        model, name = LinearRegression(), "LinearRegression"
     else:
-        vc = y.value_counts()
-        per_class = int(vc.min())
-        if per_class < 2:
-            return Baseline("LogisticRegression", "accuracy", None,
-                            note="a class has <2 samples; can't cross-validate")
         name = "LogisticRegression"
-        cv = min(5, max(2, per_class))
-        # plain accuracy flatters imbalanced data (a majority-only guesser scores
-        # high), so on imbalance we both weight the classes (the tool's own advice)
-        # and score with balanced accuracy. Otherwise plain LogisticRegression + accuracy.
-        if (vc.max() / len(y)) > 0.7:
-            model = LogisticRegression(max_iter=1000, class_weight="balanced")
-            metric, scoring = "balanced accuracy", "balanced_accuracy"
-        else:
-            model = LogisticRegression(max_iter=1000)
-            metric, scoring = "accuracy", "accuracy"
+        cw = "balanced" if _sklearn.needs_class_weight(y) else None
+        model = LogisticRegression(max_iter=1000, class_weight=cw)
 
     pipe = Pipeline([("pre", pre), ("model", model)])
     scores = cross_val_score(pipe, X, y, cv=cv, scoring=scoring)
