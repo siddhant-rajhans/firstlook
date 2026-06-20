@@ -79,6 +79,39 @@ report.baseline      # Baseline(model="LinearRegression", metric="R2", score=0.9
 
 Needs scikit-learn: `pip install "firstlook[fit]"`.
 
+## Or fit a whole leaderboard
+
+`fit="all"` fits and ranks a panel of models — Linear/Logistic, RandomForest, HistGradientBoosting, KNeighbors — through the same pipeline and the same honest metric, by cross-validation:
+
+```python
+report = firstlook.at(df, target="churned", fit="all")
+report.leaderboard   # ranked entries; report.baseline is the winner
+```
+
+On imbalanced data it weights the classes and scores with balanced accuracy, so the ranking is honest rather than flattering.
+
+## Explain my data, with any LLM
+
+`explain=` adds a plain-English read of the *structured* report (task, key features, warnings, scores) — never your raw rows. It's provider-agnostic and the core ships no LLM SDK:
+
+```python
+firstlook.at(df, target="species", explain="ollama:llama3")      # local, private
+firstlook.at(df, target="species", explain="openai:gpt-4o-mini") # or any cloud
+firstlook.at(df, target="species", explain=my_completer)         # or your own (prompt) -> text
+firstlook.at(df, target="species", explain=True)                 # auto-detect (env / local Ollama)
+```
+
+Local-first by default; keys are read from the environment and never logged. A failed call degrades to no summary rather than raising.
+
+## Data doctor
+
+`diagnose=True` flags the problems that quietly wreck models — target leakage, ID-like and constant columns, near-duplicate rows, heavy skew/outliers — with a fix for each:
+
+```python
+report = firstlook.at(df, target="y", diagnose=True)
+report.diagnosis     # Diagnosis(findings=[Finding(kind="leakage", severity="high", ...), ...])
+```
+
 ## What it handles today
 
 Tabular regression, classification, and clustering. Image / text / time-series problems are out of scope for now.
